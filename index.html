@@ -140,7 +140,7 @@
         <button class="nav-btn" onclick="nextCard()">Next →</button>
     </div>
 
-    <script>
+ <script>
         let cardsData = [];
         let currentIndex = 0;
         let isFlipped = false;
@@ -159,22 +159,32 @@
                 });
         };
 
+        // --- V3.0 升级版解析器：专门解决逗号问题 ---
         function parseCSV(text) {
             const lines = text.trim().split(/\r\n|\n/);
             const headers = lines[0].split(',').map(h => h.trim());
+            
             const result = [];
             for(let i = 1; i < lines.length; i++) {
                 if(!lines[i].trim()) continue;
-                // 简单的逗号分割，如果内容里没有英文逗号，这就足够了
-                const row = lines[i].split(','); 
+                
+                // 🌟 核心修改：使用正则来分割，忽略引号里面的逗号
+                const row = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                
                 let obj = {};
                 headers.forEach((header, index) => {
-                    obj[header] = row[index] ? row[index].trim() : "";
+                    let val = row[index] ? row[index].trim() : "";
+                    // 去掉 Excel 自动加的双引号
+                    if (val.startsWith('"') && val.endsWith('"')) {
+                        val = val.slice(1, -1); 
+                    }
+                    obj[header] = val;
                 });
                 result.push(obj);
             }
             return result;
         }
+        // ------------------------------------------
 
         function renderCard(index) {
             const item = cardsData[index];
@@ -183,19 +193,12 @@
             isFlipped = false;
 
             setTimeout(() => {
-                // --- 🌟 关键修改：自动智能添加后缀 ---
-                // 如果 Image 名字里不包含 '.', 自动加 .jpg
+                // 智能补全后缀逻辑
                 let imgName = item.Image;
-                if (imgName && !imgName.includes('.')) {
-                    imgName += '.jpg';
-                }
+                if (imgName && !imgName.includes('.')) imgName += '.jpg';
 
-                // 如果 Audio 名字里不包含 '.', 自动加 .mp3
                 let audioName = item.Audio;
-                if (audioName && !audioName.includes('.')) {
-                    audioName += '.mp3';
-                }
-                // -------------------------------------
+                if (audioName && !audioName.includes('.')) audioName += '.mp3';
 
                 document.getElementById('front-img').src = `assets/${imgName}`;
                 document.getElementById('back-img').src = `assets/${imgName}`;
@@ -207,7 +210,6 @@
                 document.getElementById('pinyin-text').innerText = item.Pinyin;
                 document.getElementById('english-text').innerText = item.English;
                 
-                // 把音频路径存到按钮上，方便播放函数调用
                 document.querySelector('.audio-btn').dataset.audio = audioName;
                 
             }, 200);
@@ -234,7 +236,6 @@
 
         function playAudio(event) {
             event.stopPropagation();
-            // 从按钮的 data 属性里获取刚才处理好的文件名
             const audioName = event.target.dataset.audio;
             const audio = new Audio(`assets/${audioName}`);
             audio.play().catch(e => console.log(e));
